@@ -3,7 +3,7 @@
 // APIキーは Vercel の環境変数 GEMINI_API_KEY に入れる（コードには絶対書かない）。
 // モデルは MODEL 環境変数で差し替え可（未設定なら gemini-2.5-flash / 無料枠対象）。
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
 
 /* {穴} を分解（フロントの parseFrame と同じ） */
 function parseFrame(frame) {
@@ -91,27 +91,8 @@ const RESPONSE_SCHEMA = {
 
 module.exports = async (req, res) => {
   const key = process.env.GEMINI_API_KEY;
-  // 診断用: ブラウザで /api/feedback を開く(GET)と、キーの有無とモデル名だけ返す（キー本体は出さない）
-  if (req.method === "GET" && !(req.query && req.query.selftest)) {
-    res.status(200).json({ ok: true, keyPresent: !!key, model: MODEL }); return;
-  }
-  // 診断用: /api/feedback?selftest=1 で Gemini に試し打ちし、生のステータスと本文を返す
-  if (req.method === "GET" && req.query && req.query.selftest) {
-    if (!key) { res.status(200).json({ error: "no key" }); return; }
-    try {
-      const cands = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-2.5-flash-lite"];
-      const results = [];
-      for (const mdl of cands) {
-        const u = `https://generativelanguage.googleapis.com/v1beta/models/${mdl}:generateContent?key=${key}`;
-        const r0 = await fetch(u, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "hi" }] }] }),
-        });
-        results.push({ mdl, status: r0.status, body: (await r0.text()).slice(0, 160) });
-      }
-      res.status(200).json({ results }); return;
-    } catch (e) { res.status(200).json({ error: String((e && e.message) || e) }); return; }
-  }
+  // 診断用: GETすると、キーの有無とモデル名だけ返す（キー本体は出さない）
+  if (req.method === "GET") { res.status(200).json({ ok: true, keyPresent: !!key, model: MODEL }); return; }
   if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
   if (!key) { res.status(500).json({ error: "GEMINI_API_KEY is not set" }); return; }
 
