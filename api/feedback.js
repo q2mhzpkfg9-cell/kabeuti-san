@@ -90,8 +90,10 @@ const RESPONSE_SCHEMA = {
 };
 
 module.exports = async (req, res) => {
-  if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
   const key = process.env.GEMINI_API_KEY;
+  // 診断用: ブラウザで /api/feedback を開く(GET)と、キーの有無とモデル名だけ返す（キー本体は出さない）
+  if (req.method === "GET") { res.status(200).json({ ok: true, keyPresent: !!key, model: MODEL }); return; }
+  if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
   if (!key) { res.status(500).json({ error: "GEMINI_API_KEY is not set" }); return; }
 
   // body は Vercel が JSON パース済み。念のため文字列でも受ける。
@@ -106,7 +108,6 @@ module.exports = async (req, res) => {
     generationConfig: {
       temperature: 0.6,
       responseMimeType: "application/json",
-      responseSchema: RESPONSE_SCHEMA,
     },
   };
 
@@ -122,9 +123,9 @@ module.exports = async (req, res) => {
       return;
     }
     const data = await r.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) { res.status(502).json({ error: "no content" }); return; }
-
+    let text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) { res.status(502).json({ error: "no content", detail: JSON.stringify(data).slice(0, 500) }); return; }
+    text = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
     const out = JSON.parse(text);
     out.name = p.teacherName || "先生";
     out.voice = p.teacherVoice || "";
