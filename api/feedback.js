@@ -99,13 +99,17 @@ module.exports = async (req, res) => {
   if (req.method === "GET" && req.query && req.query.selftest) {
     if (!key) { res.status(200).json({ error: "no key" }); return; }
     try {
-      const u = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
-      const r0 = await fetch(u);
-      const j = await r0.json();
-      const names = (j.models || [])
-        .filter((m) => (m.supportedGenerationMethods || []).includes("generateContent"))
-        .map((m) => m.name);
-      res.status(200).json({ status: r0.status, current: MODEL, models: names }); return;
+      const cands = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-2.5-flash-lite"];
+      const results = [];
+      for (const mdl of cands) {
+        const u = `https://generativelanguage.googleapis.com/v1beta/models/${mdl}:generateContent?key=${key}`;
+        const r0 = await fetch(u, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "hi" }] }] }),
+        });
+        results.push({ mdl, status: r0.status, body: (await r0.text()).slice(0, 160) });
+      }
+      res.status(200).json({ results }); return;
     } catch (e) { res.status(200).json({ error: String((e && e.message) || e) }); return; }
   }
   if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
