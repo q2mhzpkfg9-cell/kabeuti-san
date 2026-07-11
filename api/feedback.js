@@ -123,14 +123,22 @@ module.exports = async (req, res) => {
       return;
     }
     const data = await r.json();
-    let text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) { res.status(502).json({ error: "no content", detail: JSON.stringify(data).slice(0, 500) }); return; }
-    text = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-    const out = JSON.parse(text);
+    const parts = (data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+    let text = parts.map((pt) => (pt && pt.text) || "").join("").trim();
+    if (!text) { res.status(502).json({ error: "no content", detail: JSON.stringify(data).slice(0, 600) }); return; }
+    // コードフェンスや前置き（思考など）を除き、最初の { から最後の } を取り出す
+    const s = text.indexOf("{"), e2 = text.lastIndexOf("}");
+    if (s >= 0 && e2 > s) text = text.slice(s, e2 + 1);
+    let out;
+    try { out = JSON.parse(text); }
+    catch (pe) { res.status(502).json({ error: "parse", detail: text.slice(0, 600) }); return; }
+    if (!out || !out.praise || !Array.isArray(out.advices)) {
+      res.status(502).json({ error: "shape", detail: JSON.stringify(out).slice(0, 400) }); return;
+    }
     out.name = p.teacherName || "先生";
     out.voice = p.teacherVoice || "";
     res.status(200).json(out);
   } catch (e) {
-    res.status(500).json({ error: String(e && e.message || e) });
+    res.status(500).json({ error: String((e && e.message) || e) });
   }
 };
