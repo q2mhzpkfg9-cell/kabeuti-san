@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>作文・要約 かべうちAI</title>
+<style>
+  :root{
+    --bg:#f4f1ea; --card:#fffdf8; --ink:#2f2a24; --sub:#6f665a;
+    --line:#e4ddcf; --accent:#e07a4f; --accent-d:#c25e35;
+    --amber:#f5e6c8; --amber-b:#e6cfa0; --blue:#e8f1fb; --blue-b:#bcd7f2;
+    --good:#5c8a5a; --sky:#4f80a8;
+    --shadow:0 6px 22px rgba(70,55,35,.10);
+    --r:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    font-family:"Hiragino Maru Gothic ProN","Hiragino Sans",system-ui,sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.7;
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:860px; margin:0 auto; padding:16px 16px 90px}
+  header.app{display:flex; align-items:center; gap:10px; padding:14px 4px 10px}
+  header.app .logo{font-size:1.5rem}
+  header.app h1{font-size:1.15rem; margin:0; letter-spacing:.02em}
+  header.app .sub{font-size:.72rem; color:var(--sub); margin-top:2px}
+
+  .roles{display:flex; gap:8px; margin:6px 0 18px; background:#eae4d7; padding:5px; border-radius:999px}
+  .roles button{
+    flex:1; border:0; background:transparent; padding:10px 8px; border-radius:999px;
+    font-family:inherit; font-size:.92rem; font-weight:700; color:var(--sub); cursor:pointer; transition:.15s;
+  }
+  .roles button.on{background:var(--card); color:var(--ink); box-shadow:var(--shadow)}
+
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--r);
+    padding:18px; box-shadow:var(--shadow); margin-bottom:16px;
+  }
+  .card h2{font-size:1rem; margin:0 0 4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .card .hint{font-size:.78rem; color:var(--sub); margin:0 0 14px}
+  .card h2 .badge{font-size:.66rem; background:var(--accent); color:#fff; padding:2px 8px; border-radius:999px; font-weight:700}
+
+  label.field{display:block; font-size:.82rem; font-weight:700; color:var(--sub); margin:14px 0 6px}
+  input[type=text], textarea, select{
+    width:100%; font-family:inherit; font-size:1rem; color:var(--ink);
+    background:#fff; border:1.5px solid var(--line); border-radius:12px; padding:11px 12px;
+  }
+  textarea{resize:vertical; line-height:1.8}
+  input:focus, textarea:focus, select:focus{outline:none; border-color:var(--accent)}
+
+  .chips{display:flex; flex-wrap:wrap; gap:8px}
+  .chip{border:1.5px solid var(--line); background:#fff; border-radius:999px; padding:7px 13px;
+    font-size:.85rem; cursor:pointer; font-family:inherit; color:var(--ink); transition:.12s;}
+  .chip.on{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700}
+
+  input[type=range]{width:100%; accent-color:var(--accent)}
+  .rangewrap{display:flex; justify-content:space-between; font-size:.72rem; color:var(--sub)}
+
+  .btn{display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    border:0; background:var(--accent); color:#fff; font-family:inherit; font-weight:800;
+    font-size:1.02rem; padding:14px 20px; border-radius:14px; cursor:pointer; width:100%;
+    box-shadow:0 4px 14px rgba(224,122,79,.35); transition:.12s;}
+  .btn:hover{background:var(--accent-d)}
+  .btn:disabled{opacity:.5; cursor:default; box-shadow:none}
+  .btn.ghost{background:#fff; color:var(--ink); border:1.5px solid var(--line); box-shadow:none}
+  .btn.small{width:auto; padding:9px 14px; font-size:.85rem}
+  .toolbar{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+
+  /* ---- ブロック編集（先生） ---- */
+  .blk{border:1px solid var(--line); border-radius:14px; padding:12px; margin-bottom:10px; background:#fffef9}
+  .blk-head{display:flex; align-items:center; gap:8px; margin-bottom:8px}
+  .blk-type{font-size:.72rem; font-weight:800; color:#fff; background:var(--sub); padding:3px 9px; border-radius:999px; white-space:nowrap}
+  .blk-type.t-frame{background:#8a6ea0}.blk-type.t-write{background:#5c8a5a}.blk-type.t-read{background:#4f80a8}
+  .blk-head .sp{flex:1}
+  .blk-head button{border:0;background:#f0eadf;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:.9rem;color:var(--sub)}
+  .blk-head button:hover{background:#e6ddca}
+  .blk label.mini{font-size:.72rem;color:var(--sub);font-weight:700;margin:8px 0 4px;display:block}
+  .ex-inputs{display:flex;flex-wrap:wrap;gap:8px}
+  .ex-inputs .ex-one{flex:1;min-width:120px}
+  .ex-inputs .ex-one span{font-size:.68rem;color:var(--accent-d);font-weight:800;display:block;margin-bottom:2px}
+  .addrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .addrow button{flex:1;min-width:140px;border:1.5px dashed var(--line);background:transparent;padding:11px;border-radius:12px;cursor:pointer;font-family:inherit;color:var(--sub);font-weight:700}
+  .note{font-size:.74rem; color:var(--sub); background:#f6f2e8; border-radius:10px; padding:10px 12px; margin-top:10px}
+
+  .aims{display:flex; flex-direction:column; gap:8px; margin-top:4px}
+  .aim{display:flex; gap:8px; align-items:center}
+  .aim input{flex:1}
+  .aim .del{border:0; background:#f0eadf; width:38px; height:38px; border-radius:10px; cursor:pointer; font-size:1rem; color:var(--sub); flex:none}
+  .addbtn{margin-top:8px; border:1.5px dashed var(--line); background:transparent; width:100%; padding:10px; border-radius:12px; cursor:pointer; font-family:inherit; color:var(--sub); font-weight:700}
+
+  /* ---- ワークシート（子ども） ---- */
+  .aims-show{display:flex; flex-wrap:wrap; gap:7px; margin:8px 0}
+  .aims-show .head{width:100%;font-size:.76rem;color:var(--sub);font-weight:700}
+  .aims-show .tag{background:#f3ede0; color:var(--sub); font-size:.78rem; padding:5px 11px; border-radius:999px}
+  .aims-show .tag b{color:var(--accent-d)}
+
+  .mihon{background:#fff8ec;border:1px solid #f0dcbf;border-radius:14px;padding:14px;margin-bottom:14px}
+  .mihon summary{cursor:pointer;font-weight:800;color:var(--accent-d);font-size:.95rem;list-style:none}
+  .mihon summary::-webkit-details-marker{display:none}
+  .mihon summary::before{content:"▶ ";font-size:.8rem}
+  .mihon[open] summary::before{content:"▼ "}
+  .mihon .m-body{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+  .m-sec .m-lab{font-size:.74rem;color:var(--sub);font-weight:700;margin-bottom:4px}
+  .m-box{background:var(--amber);border:1px solid var(--amber-b);border-radius:8px;padding:9px 11px;font-size:.92rem;white-space:pre-wrap;color:#4a3f2c}
+  .m-line{font-size:1rem}
+  .m-fill{background:var(--amber);border:1px solid var(--amber-b);border-radius:6px;padding:2px 8px;font-weight:700;color:#4a3f2c}
+  .m-read{background:#eef4f8;border:1px solid #cfe0ea}
+
+  .wk{display:flex;flex-direction:column;gap:16px}
+  .wk-sec .wk-lab{display:inline-block;background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px 11px;font-size:.8rem;color:var(--sub);font-weight:700;margin-bottom:8px}
+  .wk-frame{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:1.05rem}
+  .wk-blank{background:var(--amber);border:1.5px solid var(--amber-b);border-radius:8px;padding:9px 10px;font-family:inherit;font-size:1rem;min-width:96px;color:var(--ink)}
+  .wk-blank::placeholder{color:#b7a988;font-size:.85rem}
+  .wk-write{width:100%;background:var(--amber);border:1.5px solid var(--amber-b);border-radius:12px;padding:11px;font-family:inherit;font-size:1rem;line-height:1.8;resize:vertical}
+  .wk-write::placeholder{color:#b7a988}
+  .wk-read{background:#eef4f8;border:1px solid #cfe0ea;border-radius:12px;padding:12px 14px;font-size:.95rem;white-space:pre-wrap}
+
+  .fb{display:none}
+  .fb.show{display:block; animation:rise .3s ease}
+  @keyframes rise{from{opacity:0; transform:translateY(8px)}to{opacity:1; transform:none}}
+  .fb .praise{background:#eef4ec; border-left:4px solid var(--good); padding:12px 14px; border-radius:0 12px 12px 0; margin-bottom:12px}
+  .fb .block{margin:14px 0}
+  .fb .block h3{font-size:.9rem; margin:0 0 8px; display:flex; align-items:center; gap:7px}
+  .fb .advice{background:#fbf3ec; border:1px solid #f0dccb; border-radius:12px; padding:12px 14px; margin-bottom:9px}
+  .fb .advice .aim-label{font-size:.72rem; color:var(--accent-d); font-weight:800; display:block; margin-bottom:3px}
+  .fb .next{background:#eef2f6; border-left:4px solid var(--sky); padding:12px 14px; border-radius:0 12px 12px 0}
+  .loading{display:none; text-align:center; padding:24px; color:var(--sub)}
+  .loading.show{display:block}
+  .dot{display:inline-block; animation:blink 1.2s infinite}
+  .dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,60%,100%{opacity:.2}30%{opacity:1}}
+
+  .hidden{display:none !important}
+  .flash{position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px); background:var(--ink); color:#fff; padding:11px 20px; border-radius:999px; font-size:.86rem; opacity:0; transition:.25s; pointer-events:none; z-index:9}
+  .flash.show{opacity:1; transform:translateX(-50%)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="app">
+    <div class="logo">✏️</div>
+    <div>
+      <h1>作文・要約 かべうちAI</h1>
+      <div class="sub">先生の「見本」と「ねらい」で、こどもの文章に寄りそう添削を</div>
+    </div>
+  </header>
+
+  <div class="roles">
+    <button id="roleChild" class="on" onclick="setRole('child')">🧒 こどもがつかう</button>
+    <button id="roleTeacher" onclick="setRole('teacher')">🍎 先生がつくる</button>
+  </div>
+
+  <!-- ================= 先生モード ================= -->
+  <section id="teacherView" class="hidden">
+    <div class="card">
+      <h2>🍎 先生のせってい<span class="badge">先生設定</span></h2>
+      <p class="hint">名前や見本の形は自由に決められます。ここで作った見本が、そのままAI添削の手本になります。</p>
+
+      <label class="field">先生の名前（〇〇先生 と表示されます）</label>
+      <input type="text" id="teacherName" placeholder="例：とち野">
+
+      <label class="field">テンプレのタイトル</label>
+      <input type="text" id="tplTitle" placeholder="例：こんなことをしているよ">
+
+      <label class="field">対象の学年</label>
+      <div class="chips" id="gradeChips">
+        <button class="chip" data-g="low">低学年 1・2年</button>
+        <button class="chip on" data-g="mid">中学年 3・4年</button>
+        <button class="chip" data-g="high">高学年 5・6年</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🧩 見本のかたちを つくる</h2>
+      <p class="hint">ブロックを積み木のように組み合わせて、作文の「型」を作ります。各ブロックに例を書くと、それが子どもへの見本になります。上下ボタンで並べ替えできます。</p>
+      <div id="blockList"></div>
+      <div class="addrow">
+        <button onclick="addBlock('frame')">＋ ✏️ 穴うめ文</button>
+        <button onclick="addBlock('write')">＋ 📝 書くらん</button>
+        <button onclick="addBlock('read')">＋ 📖 読むぶんしょう</button>
+      </div>
+      <div class="note">✏️ 穴うめ文：<b>{ }</b> で囲むと穴になります（例：<b>{だれ}は、{どこ}で{なに}をしています。</b>）／ 📝 書くらん：ラベル＋自由記述（例：「まず、」）／ 📖 読むぶんしょう：要約などで子どもに見せる文章</div>
+    </div>
+
+    <div class="card">
+      <h2>🎯 今回みてほしい「観点・ねらい」</h2>
+      <p class="hint">AIはこれを中心に添削します。例：「主語と述語の対応」「順序の言葉が使えているか」「気持ちが書けているか」</p>
+      <div class="aims" id="aimList"></div>
+      <button class="addbtn" onclick="addAim('')">＋ 観点を追加</button>
+    </div>
+
+    <div class="card">
+      <h2>🗣 添削のトーンと ひとこと</h2>
+      <label class="field">添削のトーン</label>
+      <input type="range" id="tone" min="0" max="2" step="1" value="1">
+      <div class="rangewrap"><span>とにかく優しく褒める</span><span>バランス</span><span>しっかり直す</span></div>
+
+      <label class="field">先生から子どもへのひとこと（AIの語り口に反映）</label>
+      <input type="text" id="teacherVoice" placeholder="例：まちがいを恐れず、思ったことをどんどん書いてみよう！">
+
+      <label class="field">
+        <input type="checkbox" id="showAims" checked style="width:auto;vertical-align:middle;margin-right:6px">
+        子どもの画面に「今回のねらい」を表示する
+      </label>
+      <label class="field">
+        <input type="checkbox" id="showMihonMidHigh" checked style="width:auto;vertical-align:middle;margin-right:6px">
+        中学年・高学年でも「先生の見本」を出す（低学年は常に表示）
+      </label>
+    </div>
+
+    <div class="card">
+      <h2>💾 保存 / 子どもへの配布</h2>
+      <p class="hint">この端末に保存すると、こどもモードにすぐ反映されます。「あいことば」を発行すれば、他の端末でも同じ設定を読み込めます。</p>
+      <div class="toolbar">
+        <button class="btn small" onclick="saveSettings()">この端末に保存</button>
+        <button class="btn small ghost" onclick="makeCode()">あいことばを発行</button>
+        <button class="btn small ghost" onclick="loadCodePrompt()">あいことばで読み込む</button>
+      </div>
+      <div id="codeBox" class="hidden" style="margin-top:12px">
+        <label class="field">あいことば（コピーして子どもに渡す）</label>
+        <textarea id="codeOut" rows="3" readonly onclick="this.select()"></textarea>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= こどもモード ================= -->
+  <section id="childView">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <h2 id="childTitle">✏️ さくぶんを かこう</h2>
+        <select id="childGrade" onchange="gradeChanged()" style="width:auto;font-size:.82rem;padding:7px 10px">
+          <option value="low">1・2年</option>
+          <option value="mid" selected>3・4年</option>
+          <option value="high">5・6年</option>
+        </select>
+      </div>
+      <p class="hint">先生の見本を見ながら、じぶんの言葉で書いてみよう。書けたら「みてもらう」をおしてね。</p>
+
+      <div id="aimsShow" class="aims-show"></div>
+      <div id="mihonWrap"></div>
+      <div id="worksheet" class="wk"></div>
+
+      <button class="btn" id="askBtn" onclick="ask()" style="margin-top:18px">🔍 先生AIに みてもらう</button>
+    </div>
+
+    <div class="loading card" id="loading">
+      <span id="loadingMsg">よんでいます</span><span class="dot">・</span><span class="dot">・</span><span class="dot">・</span>
+    </div>
+
+    <div class="card fb" id="feedback">
+      <h2 id="fbTitle">💬 先生AIからの おへんじ</h2>
+      <div id="fbBody"></div>
+      <div class="note">※ これはAIのアドバイスです。さいごは自分で考えて、なおすかどうか決めよう。</div>
+    </div>
+  </section>
+</div>
+
+<div class="flash" id="flash"></div>
+
+<script>
+/* ===================================================================
+   状態
+=================================================================== */
+const KEY = "kabeuchi_ai_v2";
+let uid = 1;
+function defaultSettings(){
+  return {
+    teacherName:"とち野", grade:"mid", title:"こんなことをしているよ",
+    blocks:[
+      {id:uid++, type:"frame", label:"【はじめ】家や学校でしていること",
+       frame:"{だれ}は、{どこ}で{なに}をしています。",
+       example:{"だれ":"ぼく","どこ":"家","なに":"せんたく"}},
+      {id:uid++, type:"write", label:"まず、", example:"せんたくものをせんたくきに入れます。そのときに、せんざいとじゅうなんざいを入れるのをわすれないようにします。"},
+      {id:uid++, type:"write", label:"つぎに、", example:"せんたくきのスイッチを入れて回します。"},
+      {id:uid++, type:"write", label:"さいごに、", example:"せんたくきがとまったら、中みをとりだしてほします。"},
+      {id:uid++, type:"write", label:"エピソード（あれば）", example:"「せんたくものがカラッとかわいたら、とても気もちがいいね。」と家ぞくに言われました。"},
+      {id:uid++, type:"write", label:"【おわり】自分の気持ち（がんばりたいことなど）", example:"家ぞくみんなが気もちよくすごせるように、せんたくをがんばってつづけたいです。"},
+    ],
+    aims:["主語と述語が対応しているか","「まず・つぎに・さいごに」の順序で書けているか"],
+    tone:1, teacherVoice:"", showAims:true, showMihonMidHigh:true
+  };
+}
+let settings = defaultSettings();
+let role = "child";
+let effectiveGrade = "mid";  // 子ども画面で選ばれている学年（見本の出し分けに使う）
+
+/* ===================================================================
+   ユーティリティ
+=================================================================== */
+function escapeHtml(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function parseFrame(frame){
+  const parts=[]; const re=/\{([^}]+)\}/g; let last=0,m;
+  while((m=re.exec(frame))){
+    if(m.index>last) parts.push({type:'text',value:frame.slice(last,m.index)});
+    parts.push({type:'blank',key:m[1]});
+    last=re.lastIndex;
+  }
+  if(last<frame.length) parts.push({type:'text',value:frame.slice(last)});
+  return parts;
+}
+let flashTimer;
+function flash(msg){
+  const f=document.getElementById('flash'); f.textContent=msg; f.classList.add('show');
+  clearTimeout(flashTimer); flashTimer=setTimeout(()=>f.classList.remove('show'),1800);
+}
+
+/* ===================================================================
+   先生：観点リスト
+=================================================================== */
+function addAim(val){
+  const list=document.getElementById('aimList');
+  const row=document.createElement('div'); row.className='aim';
+  row.innerHTML='<input type="text" placeholder="見てほしいポイント"><button class="del" title="消す">✕</button>';
+  row.querySelector('input').value = val||'';
+  row.querySelector('.del').onclick=()=>row.remove();
+  list.appendChild(row);
+}
+function readAims(){ return [...document.querySelectorAll('#aimList input')].map(i=>i.value.trim()).filter(Boolean); }
+
+/* ===================================================================
+   先生：ブロック編集
+=================================================================== */
+const TYPE_META = {
+  frame:{cls:'t-frame', label:'✏️ 穴うめ文'},
+  write:{cls:'t-write', label:'📝 書くらん'},
+  read:{cls:'t-read',  label:'📖 読むぶんしょう'},
+};
+function renderBlockEditors(){
+  const box=document.getElementById('blockList'); box.innerHTML='';
+  settings.blocks.forEach((b,idx)=>{
+    const el=document.createElement('div'); el.className='blk'; el.dataset.id=b.id;
+    const meta=TYPE_META[b.type];
+    let inner='<div class="blk-head">'
+      +'<span class="blk-type '+meta.cls+'">'+meta.label+'</span><span class="sp"></span>'
+      +'<button title="上へ" onclick="moveBlock('+idx+',-1)">▲</button>'
+      +'<button title="下へ" onclick="moveBlock('+idx+',1)">▼</button>'
+      +'<button title="消す" onclick="delBlock('+idx+')">✕</button></div>';
+
+    if(b.type==='frame'){
+      inner+='<label class="mini">ラベル（左に出る見出し）</label><input type="text" class="blk-label">';
+      inner+='<label class="mini">文の型（穴は { } で囲む）</label><input type="text" class="blk-frame">';
+      inner+='<label class="mini">🍎 見本（穴に入る言葉）</label><div class="ex-inputs blk-frame-ex"></div>';
+    }else if(b.type==='write'){
+      inner+='<label class="mini">ラベル</label><input type="text" class="blk-label">';
+      inner+='<label class="mini">🍎 見本（例文）</label><textarea class="blk-ex" rows="2"></textarea>';
+    }else{ // read
+      inner+='<label class="mini">ラベル</label><input type="text" class="blk-label">';
+      inner+='<label class="mini">子どもに見せる文章</label><textarea class="blk-text" rows="4"></textarea>';
+    }
+    el.innerHTML=inner;
+    el.querySelector('.blk-label').value=b.label||'';
+    if(b.type==='frame'){
+      const fr=el.querySelector('.blk-frame'); fr.value=b.frame||'';
+      renderFrameExamples(el,b);
+      fr.addEventListener('change',()=>{ b.frame=fr.value; renderFrameExamples(el,b); });
+    }else if(b.type==='write'){
+      el.querySelector('.blk-ex').value=b.example||'';
+    }else{
+      el.querySelector('.blk-text').value=b.text||'';
+    }
+    box.appendChild(el);
+  });
+}
+function renderFrameExamples(el,b){
+  const wrap=el.querySelector('.blk-frame-ex'); wrap.innerHTML='';
+  const keys=[...new Set(parseFrame(b.frame||'').filter(p=>p.type==='blank').map(p=>p.key))];
+  if(!keys.length){ wrap.innerHTML='<span style="font-size:.74rem;color:var(--sub)">（穴がありません）</span>'; return; }
+  b.example=b.example||{};
+  keys.forEach(k=>{
+    const one=document.createElement('div'); one.className='ex-one';
+    one.innerHTML='<span>'+escapeHtml(k)+'</span><input type="text" data-key="'+escapeHtml(k)+'">';
+    one.querySelector('input').value=b.example[k]||'';
+    wrap.appendChild(one);
+  });
+}
+function collectBlocks(){
+  const els=[...document.querySelectorAll('#blockList .blk')];
+  els.forEach(el=>{
+    const b=settings.blocks.find(x=>x.id==el.dataset.id); if(!b)return;
+    b.label=el.querySelector('.blk-label').value;
+    if(b.type==='frame'){
+      b.frame=el.querySelector('.blk-frame').value;
+      const ex={}; el.querySelectorAll('.blk-frame-ex input').forEach(i=>ex[i.dataset.key]=i.value);
+      b.example=ex;
+    }else if(b.type==='write'){
+      b.example=el.querySelector('.blk-ex').value;
+    }else{
+      b.text=el.querySelector('.blk-text').value;
+    }
+  });
+}
+function addBlock(type){
+  collectBlocks();
+  const b={id:uid++, type, label:type==='frame'?'':(type==='read'?'読むぶんしょう':'書くらん')};
+  if(type==='frame'){ b.frame="{　}"; b.example={}; }
+  else if(type==='write'){ b.example=''; }
+  else { b.text=''; }
+  settings.blocks.push(b); renderBlockEditors();
+}
+function delBlock(idx){ collectBlocks(); settings.blocks.splice(idx,1); renderBlockEditors(); }
+function moveBlock(idx,dir){
+  collectBlocks(); const j=idx+dir; if(j<0||j>=settings.blocks.length)return;
+  const a=settings.blocks; [a[idx],a[j]]=[a[j],a[idx]]; renderBlockEditors();
+}
+
+/* ===================================================================
+   先生UI 反映・収集
+=================================================================== */
+function fillTeacherUI(){
+  document.getElementById('teacherName').value=settings.teacherName||'';
+  document.getElementById('tplTitle').value=settings.title||'';
+  document.querySelectorAll('#gradeChips .chip').forEach(c=>c.classList.toggle('on',c.dataset.g===settings.grade));
+  const al=document.getElementById('aimList'); al.innerHTML='';
+  (settings.aims.length?settings.aims:['']).forEach(a=>addAim(a));
+  document.getElementById('tone').value=settings.tone;
+  document.getElementById('teacherVoice').value=settings.teacherVoice||'';
+  document.getElementById('showAims').checked=settings.showAims;
+  document.getElementById('showMihonMidHigh').checked=settings.showMihonMidHigh;
+  renderBlockEditors();
+}
+document.getElementById('gradeChips').addEventListener('click',e=>{
+  const b=e.target.closest('.chip'); if(!b)return;
+  settings.grade=b.dataset.g;
+  document.querySelectorAll('#gradeChips .chip').forEach(c=>c.classList.toggle('on',c===b));
+});
+function collectFromTeacherUI(){
+  settings.teacherName=document.getElementById('teacherName').value.trim()||"先生";
+  settings.title=document.getElementById('tplTitle').value.trim();
+  settings.aims=readAims();
+  settings.tone=+document.getElementById('tone').value;
+  settings.teacherVoice=document.getElementById('teacherVoice').value.trim();
+  settings.showAims=document.getElementById('showAims').checked;
+  settings.showMihonMidHigh=document.getElementById('showMihonMidHigh').checked;
+  collectBlocks();
+}
+
+/* ===================================================================
+   保存・あいことば
+=================================================================== */
+function saveSettings(){ collectFromTeacherUI(); localStorage.setItem(KEY,JSON.stringify(settings)); flash("この端末に保存しました"); renderChild(); }
+function makeCode(){
+  collectFromTeacherUI();
+  const code="KABE2-"+btoa(unescape(encodeURIComponent(JSON.stringify(settings))));
+  document.getElementById('codeBox').classList.remove('hidden');
+  document.getElementById('codeOut').value=code; flash("あいことばを発行しました");
+}
+function loadCode(code){
+  try{
+    const json=decodeURIComponent(escape(atob(code.replace(/^KABE2-/,'').trim())));
+    const data=JSON.parse(json);
+    settings=Object.assign(defaultSettings(),data);
+    if(data.showMihon!==undefined && data.showMihonMidHigh===undefined) settings.showMihonMidHigh=data.showMihon;
+    let mx=0; settings.blocks.forEach(b=>{ if(typeof b.id!=='number')b.id=++mx; mx=Math.max(mx,b.id); }); uid=mx+1;
+    localStorage.setItem(KEY,JSON.stringify(settings));
+    fillTeacherUI(); renderChild(); flash("あいことばを読み込みました");
+  }catch(e){ flash("あいことばが正しくありません"); }
+}
+function loadCodePrompt(){ const c=prompt("あいことばを貼りつけてください"); if(c) loadCode(c); }
+function loadSaved(){
+  const raw=localStorage.getItem(KEY);
+  if(raw){ try{ const d=JSON.parse(raw); settings=Object.assign(defaultSettings(),d);
+    if(d.showMihon!==undefined && d.showMihonMidHigh===undefined) settings.showMihonMidHigh=d.showMihon;
+    let mx=0; settings.blocks.forEach(b=>{ if(typeof b.id!=='number')b.id=++mx; mx=Math.max(mx,b.id);}); uid=mx+1;
+  }catch(e){} }
+}
+
+/* ===================================================================
+   役割切り替え
+=================================================================== */
+function setRole(r){
+  role=r;
+  document.getElementById('roleChild').classList.toggle('on',r==='child');
+  document.getElementById('roleTeacher').classList.toggle('on',r==='teacher');
+  document.getElementById('childView').classList.toggle('hidden',r!=='child');
+  document.getElementById('teacherView').classList.toggle('hidden',r!=='teacher');
+  if(r==='teacher') fillTeacherUI();
+  if(r==='child'){ if(!document.getElementById('teacherView').classList.contains('hidden')) collectFromTeacherUI(); renderChild(); }
+}
+
+/* ===================================================================
+   こども：ワークシート描画
+=================================================================== */
+function renderChild(){
+  const name=settings.teacherName||"先生";
+  effectiveGrade=settings.grade;
+  document.getElementById('childGrade').value=settings.grade;
+  document.getElementById('childTitle').textContent="✏️ "+(settings.title||"さくぶんを かこう");
+  document.getElementById('askBtn').textContent="🔍 "+name+"先生に みてもらう";
+  document.getElementById('fbTitle').textContent="💬 "+name+"先生からの おへんじ";
+
+  // ねらい
+  const show=document.getElementById('aimsShow');
+  if(settings.showAims && settings.aims.length){
+    show.innerHTML='<div class="head">今回みてもらうポイント</div>'
+      +settings.aims.map(a=>'<span class="tag">🎯 <b>'+escapeHtml(a)+'</b></span>').join('');
+  }else show.innerHTML='';
+
+  // 見本（低学年は常に表示、中・高は先生の設定しだい）
+  renderMihon();
+
+  // ワークシート本体
+  const wk=document.getElementById('worksheet'); wk.innerHTML='';
+  settings.blocks.forEach((b,i)=>{
+    const sec=document.createElement('div'); sec.className='wk-sec'; sec.dataset.i=i;
+    if(b.label) sec.innerHTML='<span class="wk-lab">'+escapeHtml(b.label)+'</span>';
+    if(b.type==='frame'){
+      const line=document.createElement('div'); line.className='wk-frame';
+      parseFrame(b.frame||'').forEach(p=>{
+        if(p.type==='text'){ const s=document.createElement('span'); s.textContent=p.value; line.appendChild(s); }
+        else{ const inp=document.createElement('input'); inp.className='wk-blank'; inp.dataset.key=p.key; inp.placeholder=p.key; line.appendChild(inp); }
+      });
+      sec.appendChild(line);
+    }else if(b.type==='write'){
+      const ta=document.createElement('textarea'); ta.className='wk-write'; ta.rows=2; ta.placeholder="ここに書こう"; sec.appendChild(ta);
+    }else{
+      const d=document.createElement('div'); d.className='wk-read'; d.textContent=b.text||''; sec.appendChild(d);
+    }
+    wk.appendChild(sec);
+  });
+  applyGrade();
+}
+function hasExample(){
+  return settings.blocks.some(b=>{
+    if(b.type==='write') return (b.example||'').trim();
+    if(b.type==='frame') return Object.values(b.example||{}).some(v=>(v||'').trim());
+    if(b.type==='read')  return (b.text||'').trim();
+    return false;
+  });
+}
+function mihonHTML(){
+  return settings.blocks.map(b=>{
+    if(b.type==='read'){
+      let h='<div class="m-sec">'; if(b.label)h+='<div class="m-lab">'+escapeHtml(b.label)+'</div>';
+      return h+'<div class="m-box m-read">'+escapeHtml(b.text||'')+'</div></div>';
+    }
+    if(b.type==='frame'){
+      let line=parseFrame(b.frame||'').map(p=> p.type==='text'
+        ? escapeHtml(p.value)
+        : '<span class="m-fill">'+escapeHtml((b.example&&b.example[p.key])||p.key)+'</span>').join('');
+      let h='<div class="m-sec">'; if(b.label)h+='<div class="m-lab">'+escapeHtml(b.label)+'</div>';
+      return h+'<div class="m-line">'+line+'</div></div>';
+    }
+    // write
+    let h='<div class="m-sec">'; if(b.label)h+='<div class="m-lab">'+escapeHtml(b.label)+'</div>';
+    return h+'<div class="m-box">'+escapeHtml(b.example||'')+'</div></div>';
+  }).join('');
+}
+function renderMihon(){
+  const name=settings.teacherName||"先生";
+  const mw=document.getElementById('mihonWrap');
+  // 低学年は常に表示。中・高学年は先生が showMihonMidHigh で選ぶ。
+  const show = hasExample() && (effectiveGrade==='low' || settings.showMihonMidHigh);
+  if(show){
+    mw.innerHTML='<details class="mihon" open><summary>🍎 '+escapeHtml(name)+'先生の見本</summary><div class="m-body">'+mihonHTML()+'</div></details>';
+  }else mw.innerHTML='';
+}
+// 子どもが学年を切り替えたとき：入力は消さず、見本だけ出し分ける
+function gradeChanged(){ effectiveGrade=document.getElementById('childGrade').value; renderMihon(); }
+function applyGrade(){ document.getElementById('childGrade').value=settings.grade; }
+
+/* ===================================================================
+   こども入力の収集
+=================================================================== */
+function collectChild(){
+  const secs=[...document.querySelectorAll('#worksheet .wk-sec')];
+  const out=[]; let filled=0, total=0; const sourceParts=[]; const meta=[];
+  secs.forEach((sec,i)=>{
+    const b=settings.blocks[i]; if(!b)return;
+    if(b.type==='read'){ if(b.text) sourceParts.push(b.text); return; }
+    total++;
+    if(b.type==='frame'){
+      let hasVal=false;
+      const line=parseFrame(b.frame||'').map(p=>{
+        if(p.type==='text') return p.value;
+        const v=(sec.querySelector('.wk-blank[data-key="'+CSS.escape(p.key)+'"]')||{}).value||'';
+        if(v.trim())hasVal=true; return v.trim()||('（'+p.key+'）');
+      }).join('');
+      if(hasVal)filled++;
+      out.push(line); meta.push({label:b.label||'はじめの文',filled:hasVal});
+    }else{
+      const v=(sec.querySelector('.wk-write')||{}).value||'';
+      if(v.trim())filled++;
+      out.push((b.label?b.label:'')+v.trim());
+      meta.push({label:b.label||'書くらん',filled:!!v.trim()});
+    }
+  });
+  return { studentText:out.filter(Boolean).join('\n'), filled, total, source:sourceParts.join('\n'), meta };
+}
+
+/* ===================================================================
+   ★★★ AIの差し込み口（本番＝Vercel関数を呼ぶ） ★★★
+   /api/feedback（Gemini）を呼ぶ。失敗時は自動でモックにフォールバックするので
+   キー未設定・オフライン・レート制限でもアプリは止まらない。
+   モデルを Claude に変えるときも、この関数はそのまま／サーバー側だけ差し替え。
+=================================================================== */
+async function askAI(payload){
+  try{
+    const res = await fetch('/api/feedback', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if(!res.ok) throw new Error('status '+res.status);
+    const data = await res.json();
+    if(!data || !data.praise || !Array.isArray(data.advices)) throw new Error('shape');
+    data.name  = data.name  || payload.teacherName;
+    if(data.voice === undefined) data.voice = payload.teacherVoice;
+    return data;
+  }catch(e){
+    // AIに届かないときは、これまでの簡易ルールベースで返す
+    const fb = mockFeedback(payload); fb._fallback = true; return fb;
+  }
+}
+
+/* いまのモック応答（先生の観点＋見本を使った簡易ルールベース） */
+function mockFeedback(p){
+  const t=p.studentText, len=t.length;
+  // ほめる
+  let praise;
+  const ratio=p.total? p.filled/p.total : 1;
+  if(ratio>=1) praise="全部のらんが うまったね！型にそって さいごまで書けています。";
+  else if(ratio>=0.5) praise="ここまで しっかり書けているね。あと少しで かんせいだよ。";
+  else praise="書きはじめられたね！見本を見ながら、空いているらんを うめていこう。";
+
+  const advices=[];
+  // 組み立て（空いている書くらん）
+  const empties=(p.meta||[]).filter(m=>!m.filled);
+  if(empties.length){
+    empties.slice(0,3).forEach(m=>advices.push({aim:'組み立て（'+m.label+'）', msg:'まだ空いているよ。見本を見て、みじかくでいいから書いてみよう。'}));
+  }else{
+    advices.push({aim:'組み立て', msg:'はじめ・なか・おわりが そろっているね。型にそって書けています。'});
+  }
+  // 観点ごと
+  (p.aims||[]).forEach(aim=>advices.push({aim, msg:checkAim(aim,t,p)}));
+
+  // つぎの一歩
+  let next;
+  if(p.source){
+    const r=Math.round(len/Math.max(p.source.length,1)*100);
+    next="元の文章の約"+r+"%の長さだよ。"+(r>60?"もう少し大事なところだけにしぼれるかな？":r<15?"短くできたね。大事なことが抜けていないか読み返そう。":"いい長さだね。");
+  }else{
+    next="先生の見本とくらべて、じゅんじょの言葉（まず・つぎに・さいごに）がそろっているか見てみよう。声に出して一回読むと、直すところが見つかるよ。";
+  }
+  return {praise, advices, next, voice:p.teacherVoice, name:p.teacherName};
+}
+function checkAim(aim,t,p){
+  const a=aim;
+  if(/たとえ|比喩/.test(a)) return /みたい|ような|まるで|みたいに/.test(t)?"「〜みたい」「〜のような」が使えているね！その調子。":"まだ『たとえ』が見つけられなかったよ。『まるで〜みたい』を1つ入れてみよう。";
+  if(/主語|述語/.test(a)) return t.split(/[。\n]/).some(s=>s.length>45)?"一つの文が長いところがあるよ。「、」で切って、だれが何をしたかをはっきりさせよう。":"文の長さがちょうどいいね。主語と述語がつながっているか読み返そう。";
+  if(/順序|じゅんじょ|まず|つぎ|さいご|手順/.test(a)) return /まず|つぎ|さいご|それから|そして/.test(t)?"順序の言葉が使えているね。読む人が場面を追いやすいよ。":"「まず・つぎに・さいごに」を入れると、やり方の順番が伝わりやすくなるよ。";
+  if(/はじめ|なか|おわり|組み立て|構成|段落/.test(a)) return t.split(/\n/).filter(x=>x.trim()).length>=3?"だんらくが分かれていて、組み立てが見えるよ。いいね。":"「はじめ・なか・おわり」で行をかえると、もっと読みやすくなるよ。";
+  if(/気持ち|思っ|感じ/.test(a)) return /うれし|たのし|かなし|びっくり|どきどき|わくわく|くやし|きもち|気もち|思っ|感じ/.test(t)?"気持ちの言葉が入っているね。その時どんな顔だったかも書くともっと伝わるよ。":"できごとは書けているよ。そのとき『どう思ったか』を1文たすと、ぐっと良くなる。";
+  if(/くわしく|くわし|具体|数|いつ|どこ/.test(a)) return "「いつ・どこで・だれと」をひとつ足すと、読む人が場面を想像しやすくなるよ。";
+  return "この観点で読むと、あなたらしさが出せているかがポイント。見本とくらべて もう一度読み返してみよう。";
+}
+
+/* ===================================================================
+   こども：みてもらう
+=================================================================== */
+async function ask(){
+  const c=collectChild();
+  if(!c.studentText.trim()){ flash("まずは なにか 書いてみよう"); return; }
+  const btn=document.getElementById('askBtn'); btn.disabled=true;
+  document.getElementById('feedback').classList.remove('show');
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('loadingMsg').textContent="よんでいます";
+
+  const payload={
+    teacherName:settings.teacherName, grade:settings.grade,
+    title:settings.title, aims:settings.aims, tone:settings.tone,
+    teacherVoice:settings.teacherVoice,
+    studentText:c.studentText, source:c.source,
+    filled:c.filled, total:c.total, meta:c.meta,
+    template:settings.blocks  // 見本＋型（本物AIが参照できるように）
+  };
+  const fb=await askAI(payload);
+
+  document.getElementById('loading').classList.remove('show');
+  renderFeedback(fb); btn.disabled=false;
+}
+function renderFeedback(fb){
+  let html='<div class="praise">🌸 '+escapeHtml(fb.praise)+'</div>';
+  if(fb.advices && fb.advices.length){
+    html+='<div class="block"><h3>🎯 見てほしかったポイント</h3>';
+    fb.advices.forEach(a=>{ html+='<div class="advice"><span class="aim-label">'+escapeHtml(a.aim)+'</span>'+escapeHtml(a.msg)+'</div>'; });
+    html+='</div>';
+  }
+  html+='<div class="next">👣 つぎの一歩：'+escapeHtml(fb.next)+'</div>';
+  if(fb.voice) html+='<div class="note" style="margin-top:12px">🍎 '+escapeHtml(fb.name||'先生')+'先生から：'+escapeHtml(fb.voice)+'</div>';
+  document.getElementById('fbBody').innerHTML=html;
+  const box=document.getElementById('feedback'); box.classList.add('show');
+  box.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+/* ===================================================================
+   起動
+=================================================================== */
+loadSaved();
+fillTeacherUI();
+renderChild();
+const urlCode=new URLSearchParams(location.search).get('code');
+if(urlCode) loadCode(urlCode);
+</script>
+</body>
+</html>
