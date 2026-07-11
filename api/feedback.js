@@ -92,7 +92,22 @@ const RESPONSE_SCHEMA = {
 module.exports = async (req, res) => {
   const key = process.env.GEMINI_API_KEY;
   // 診断用: ブラウザで /api/feedback を開く(GET)と、キーの有無とモデル名だけ返す（キー本体は出さない）
-  if (req.method === "GET") { res.status(200).json({ ok: true, keyPresent: !!key, model: MODEL }); return; }
+  if (req.method === "GET" && !(req.query && req.query.selftest)) {
+    res.status(200).json({ ok: true, keyPresent: !!key, model: MODEL }); return;
+  }
+  // 診断用: /api/feedback?selftest=1 で Gemini に試し打ちし、生のステータスと本文を返す
+  if (req.method === "GET" && req.query && req.query.selftest) {
+    if (!key) { res.status(200).json({ error: "no key" }); return; }
+    try {
+      const u = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
+      const r0 = await fetch(u, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "こんにちは、と一言だけ返して。" }] }] }),
+      });
+      const t0 = await r0.text();
+      res.status(200).json({ status: r0.status, body: t0.slice(0, 900) }); return;
+    } catch (e) { res.status(200).json({ error: String((e && e.message) || e) }); return; }
+  }
   if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
   if (!key) { res.status(500).json({ error: "GEMINI_API_KEY is not set" }); return; }
 
