@@ -131,6 +131,30 @@
   .dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
   @keyframes blink{0%,60%,100%{opacity:.2}30%{opacity:1}}
 
+  /* いいね→先生に見せに行こう バナー */
+  .showteacher{background:linear-gradient(135deg,#fff3d6,#ffe4c7);border:2px solid #f0c98a;border-radius:14px;padding:16px;text-align:center;margin-bottom:14px;animation:pop .4s ease}
+  .showteacher .big{font-size:1.15rem;font-weight:800;color:#c25e35}
+  .showteacher .sub{font-size:.8rem;color:var(--sub);margin-top:4px}
+  @keyframes pop{0%{transform:scale(.9);opacity:0}60%{transform:scale(1.03)}100%{transform:scale(1);opacity:1}}
+  .btn.sub2{background:#fff;color:var(--ink);border:1.5px solid var(--line);box-shadow:none;margin-top:10px}
+  /* 原稿用紙（縦書き）モーダル */
+  .genko-modal{position:fixed;inset:0;background:rgba(40,32,22,.55);display:none;align-items:center;justify-content:center;z-index:20;padding:16px}
+  .genko-modal.show{display:flex}
+  .genko-card{background:var(--card);border-radius:16px;max-width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:var(--shadow);overflow:hidden}
+  .genko-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+  .genko-head h3{margin:0;font-size:1rem}
+  .genko-head .x{border:0;background:#f0eadf;width:34px;height:34px;border-radius:9px;cursor:pointer;font-size:1rem;color:var(--sub)}
+  .genko-scroll{overflow:auto;padding:18px;background:#fbfaf5}
+  .genko-grid{display:flex;flex-direction:row-reverse;justify-content:flex-start;width:max-content;margin:0 auto}
+  .genko-col{display:flex;flex-direction:column}
+  .genko-cell{width:30px;height:30px;border:.5px solid #d8ceb8;display:flex;align-items:center;justify-content:center;font-size:19px;line-height:1;color:#3a3226;background:#fffdf7}
+  .genko-cell.blank{color:transparent}
+  @media print{
+    body>*:not(#genkoModal){display:none !important}
+    #genkoModal{position:static;display:block !important;background:#fff;padding:0}
+    #genkoModal .genko-card{box-shadow:none;max-height:none;border-radius:0}
+    #genkoModal .genko-head{display:none}
+  }
   .hidden{display:none !important}
   .flash{position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px); background:var(--ink); color:#fff; padding:11px 20px; border-radius:999px; font-size:.86rem; opacity:0; transition:.25s; pointer-events:none; z-index:9}
   .flash.show{opacity:1; transform:translateX(-50%)}
@@ -242,6 +266,7 @@
       <div id="worksheet" class="wk"></div>
 
       <button class="btn" id="askBtn" onclick="ask()" style="margin-top:18px">🔍 先生AIに みてもらう</button>
+      <button class="btn sub2" id="genkoBtn" onclick="openGenko()">📄 げんこう用紙で見る（たてがき）</button>
     </div>
 
     <div class="loading card" id="loading">
@@ -256,6 +281,18 @@
   </section>
 </div>
 
+<div class="genko-modal" id="genkoModal" onclick="if(event.target===this)closeGenko()">
+  <div class="genko-card">
+    <div class="genko-head">
+      <h3 id="genkoTitle">📄 げんこう用紙</h3>
+      <div style="display:flex;gap:8px">
+        <button class="x" title="いんさつ" onclick="printGenko()">🖨</button>
+        <button class="x" title="とじる" onclick="closeGenko()">✕</button>
+      </div>
+    </div>
+    <div class="genko-scroll"><div class="genko-grid" id="genkoGrid"></div></div>
+  </div>
+</div>
 <div class="flash" id="flash"></div>
 
 <script>
@@ -641,7 +678,8 @@ function mockFeedback(p){
   }else{
     next="先生の見本とくらべて、じゅんじょの言葉（まず・つぎに・さいごに）がそろっているか見てみよう。声に出して一回読むと、直すところが見つかるよ。";
   }
-  return {praise, advices, next, voice:p.teacherVoice, name:p.teacherName};
+  const ready = (p.total>0 && p.filled===p.total && t.length>=40);
+  return {praise, advices, next, voice:p.teacherVoice, name:p.teacherName, ready};
 }
 function checkAim(aim,t,p){
   const a=aim;
@@ -679,7 +717,11 @@ async function ask(){
   renderFeedback(fb); btn.disabled=false;
 }
 function renderFeedback(fb){
-  let html='<div class="praise">🌸 '+escapeHtml(fb.praise)+'</div>';
+  let html='';
+  if(fb.ready){
+    html+='<div class="showteacher"><div class="big">🎉 いいね！先生に見せに行こう！</div><div class="sub">よく書けています。この作文を先生に見せてみよう。</div></div>';
+  }
+  html+='<div class="praise">🌸 '+escapeHtml(fb.praise)+'</div>';
   if(fb.advices && fb.advices.length){
     html+='<div class="block"><h3>🎯 見てほしかったポイント</h3>';
     fb.advices.forEach(a=>{ html+='<div class="advice"><span class="aim-label">'+escapeHtml(a.aim)+'</span>'+escapeHtml(a.msg)+'</div>'; });
@@ -691,6 +733,42 @@ function renderFeedback(fb){
   const box=document.getElementById('feedback'); box.classList.add('show');
   box.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
+
+/* ===================================================================
+   原稿用紙（縦書き）表示
+=================================================================== */
+const GENKO_ROWS = 20; // 1列（縦）のマス数
+function openGenko(){
+  const c = collectChild();
+  const paras = (c.studentText||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  document.getElementById('genkoTitle').textContent = '📄 '+(settings.title||'げんこう用紙');
+  const grid = document.getElementById('genkoGrid');
+  if(!paras.length){
+    grid.innerHTML='<div style="padding:20px;color:var(--sub)">まだ何も書かれていません。</div>';
+  }else{
+    // 段落ごとに新しい列＋1マス下げ。列は上→下、列の並びは右→左。
+    const columns=[];
+    paras.forEach(par=>{
+      let col=['']; // 段落のはじめは1マス下げる
+      for(const ch of Array.from(par)){
+        if(col.length>=GENKO_ROWS){ columns.push(col); col=[]; }
+        col.push(ch);
+      }
+      columns.push(col);
+    });
+    grid.innerHTML = columns.map(col=>{
+      let cells='';
+      for(let i=0;i<GENKO_ROWS;i++){
+        const ch=col[i]||'';
+        cells+='<div class="genko-cell'+(ch?'':' blank')+'">'+escapeHtml(ch||'　')+'</div>';
+      }
+      return '<div class="genko-col">'+cells+'</div>';
+    }).join('');
+  }
+  document.getElementById('genkoModal').classList.add('show');
+}
+function closeGenko(){ document.getElementById('genkoModal').classList.remove('show'); }
+function printGenko(){ window.print(); }
 
 /* ===================================================================
    起動
