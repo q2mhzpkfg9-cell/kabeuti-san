@@ -738,9 +738,30 @@ function renderFeedback(fb){
    原稿用紙（縦書き）表示
 =================================================================== */
 const GENKO_ROWS = 20; // 1列（縦）のマス数
+// 原稿用紙用に、実際に書かれた欄だけを段落として組み立てる（空欄のラベルは入れない）
+function assembleForGenko(){
+  const secs=[...document.querySelectorAll('#worksheet .wk-sec')];
+  const paras=[];
+  secs.forEach((sec,i)=>{
+    const b=settings.blocks[i]; if(!b) return;
+    if(b.type==='read') return;
+    if(b.type==='frame'){
+      let hasVal=false;
+      const line=parseFrame(b.frame||'').map(p=>{
+        if(p.type==='text') return p.value;
+        const v=((sec.querySelector('.wk-blank[data-key="'+CSS.escape(p.key)+'"]')||{}).value||'').trim();
+        if(v) hasVal=true; return v;
+      }).join('');
+      if(hasVal && line.trim()) paras.push(line);
+    }else{
+      const v=((sec.querySelector('.wk-write')||{}).value||'').trim();
+      if(v) paras.push((b.label?b.label:'')+v);
+    }
+  });
+  return paras;
+}
 function openGenko(){
-  const c = collectChild();
-  const paras = (c.studentText||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  const paras = assembleForGenko();
   document.getElementById('genkoTitle').textContent = '📄 '+(settings.title||'げんこう用紙');
   const grid = document.getElementById('genkoGrid');
   if(!paras.length){
