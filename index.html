@@ -149,6 +149,9 @@
   .genko-col{display:flex;flex-direction:column}
   .genko-cell{width:30px;height:30px;border:.5px solid #d8ceb8;display:flex;align-items:center;justify-content:center;font-size:19px;line-height:1;color:#3a3226;background:#fffdf7}
   .genko-cell.blank{color:transparent}
+  .genko-cell.hang{flex-direction:column;font-size:13px;line-height:1.02}
+  .genko-cell.hang span{display:block}
+  .fb ruby rt{font-size:.55em;color:var(--sub);font-weight:400}
   @media print{
     body>*:not(#genkoModal){display:none !important}
     #genkoModal{position:static;display:block !important;background:#fff;padding:0}
@@ -326,6 +329,10 @@ let effectiveGrade = "mid";  // 子ども画面で選ばれている学年（見
    ユーティリティ
 =================================================================== */
 function escapeHtml(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+// 「漢字（かな）」の（かな）を、漢字の上のルビに変換（HTMLエスケープ後に実行）
+function rubyify(s){
+  return escapeHtml(s).replace(/([一-龠々〆ヶ]+)（([ぁ-ゖァ-ヶゝゞ゛゜ー]+)）/g,'<ruby>$1<rt>$2</rt></ruby>');
+}
 function parseFrame(frame){
   const parts=[]; const re=/\{([^}]+)\}/g; let last=0,m;
   while((m=re.exec(frame))){
@@ -723,13 +730,13 @@ function renderFeedback(fb){
   if(fb.ready){
     html+='<div class="showteacher"><div class="big">🎉 いいね！先生に見せに行こう！</div><div class="sub">よく書けています。この作文を先生に見せてみよう。</div></div>';
   }
-  html+='<div class="praise">🌸 '+escapeHtml(fb.praise)+'</div>';
+  html+='<div class="praise">🌸 '+rubyify(fb.praise)+'</div>';
   if(fb.advices && fb.advices.length){
     html+='<div class="block"><h3>🎯 見てほしかったポイント</h3>';
-    fb.advices.forEach(a=>{ html+='<div class="advice"><span class="aim-label">'+escapeHtml(a.aim)+'</span>'+escapeHtml(a.msg)+'</div>'; });
+    fb.advices.forEach(a=>{ html+='<div class="advice"><span class="aim-label">'+rubyify(a.aim)+'</span>'+rubyify(a.msg)+'</div>'; });
     html+='</div>';
   }
-  html+='<div class="next">👣 つぎの一歩：'+escapeHtml(fb.next)+'</div>';
+  html+='<div class="next">👣 つぎの一歩：'+rubyify(fb.next)+'</div>';
   if(fb.voice) html+='<div class="note" style="margin-top:12px">🍎 '+escapeHtml(fb.name||'先生')+'先生から：'+escapeHtml(fb.voice)+'</div>';
   document.getElementById('fbBody').innerHTML=html;
   const box=document.getElementById('feedback'); box.classList.add('show');
@@ -770,11 +777,21 @@ function openGenko(){
     grid.innerHTML='<div style="padding:20px;color:var(--sub)">まだ何も書かれていません。</div>';
   }else{
     // 段落ごとに新しい列＋1マス下げ。列は上→下、列の並びは右→左。
+    // 行頭にきてはいけない字（禁則）→前の列の一番下のマスにぶら下げる
+    const HEAD_NG = new Set(Array.from("、。，．・？！」』）｝〕〉》】ぁぃぅぇぉっゃゅょゎゝゞ゛゜ー"));
+    // 行末にきてはいけない字（開きかっこ）→次の列の頭へ送る
+    const TAIL_NG = new Set(Array.from("「『（｛〔〈《【"));
     const columns=[];
     paras.forEach(par=>{
+      const chars=Array.from(par);
       let col=['']; // 段落のはじめは1マス下げる
-      for(const ch of Array.from(par)){
-        if(col.length>=GENKO_ROWS){ columns.push(col); col=[]; }
+      for(let k=0;k<chars.length;k++){
+        const ch=chars[k];
+        if(col.length>=GENKO_ROWS){
+          if(HEAD_NG.has(ch)){ col[col.length-1]+=ch; continue; } // ぶら下げ
+          columns.push(col); col=[];
+        }
+        if(col.length===GENKO_ROWS-1 && TAIL_NG.has(ch)){ columns.push(col); col=[]; } // 追い出し
         col.push(ch);
       }
       columns.push(col);
@@ -782,8 +799,10 @@ function openGenko(){
     grid.innerHTML = columns.map(col=>{
       let cells='';
       for(let i=0;i<GENKO_ROWS;i++){
-        const ch=col[i]||'';
-        cells+='<div class="genko-cell'+(ch?'':' blank')+'">'+escapeHtml(ch||'　')+'</div>';
+        const s=col[i]||'';
+        if(!s){ cells+='<div class="genko-cell blank">　</div>'; }
+        else if(Array.from(s).length===1){ cells+='<div class="genko-cell">'+escapeHtml(s)+'</div>'; }
+        else{ cells+='<div class="genko-cell hang">'+Array.from(s).map(c=>'<span>'+escapeHtml(c)+'</span>').join('')+'</div>'; }
       }
       return '<div class="genko-col">'+cells+'</div>';
     }).join('');
