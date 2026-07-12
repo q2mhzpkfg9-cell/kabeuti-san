@@ -618,7 +618,9 @@ function collectChild(){
     }else{
       const v=(sec.querySelector('.wk-write')||{}).value||'';
       if(v.trim())filled++;
-      out.push((b.label?b.label:'')+v.trim());
+      // 「まず、」等のつなぎ言葉（読点で終わるラベル）は本文に付ける。見出しラベルは付けない
+      const pre=(b.label && /、\s*$/.test(b.label))?b.label:'';
+      out.push(pre+v.trim());
       meta.push({label:b.label||'書くらん',filled:!!v.trim()});
     }
   });
@@ -755,7 +757,7 @@ function assembleForGenko(){
       if(hasVal && line.trim()) paras.push(line);
     }else{
       const v=((sec.querySelector('.wk-write')||{}).value||'').trim();
-      if(v) paras.push((b.label?b.label:'')+v);
+      if(v){ const pre=(b.label && /、\s*$/.test(b.label))?b.label:''; paras.push(pre+v); }
     }
   });
   return paras;
