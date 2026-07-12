@@ -24,7 +24,7 @@
 4. **環境変数を登録**（ここが唯一の手作業）
    - Vercelのプロジェクト → Settings → Environment Variables
    - `GEMINI_API_KEY` = 1で取ったキー を追加 → Save
-   - （任意）`GEMINI_MODEL` = `gemini-2.5-flash`（既定）/ `gemini-2.5-flash-lite`（もっと安く）
+   - （任意）`GEMINI_MODEL` = `gemini-flash-latest`（既定）/ `gemini-flash-lite-latest`（もっと安く）
 5. **再デプロイ**（Deployments → 最新 → Redeploy）で環境変数が反映される
 
 → 発行されたURL（例 `https://kabeuchi-ai.vercel.app`）を子どもに配布。
